@@ -1,0 +1,355 @@
+/**
+ * Insurance Claims network definition.
+ */
+namespace org.insurance.network
+
+/**
+ * Two levels for a insurance employee
+ * An agent and a manager for authorization
+ */
+enum InsEmpLevel {
+  o AGENT
+  o MANAGER  
+}
+
+/**
+ * Nominee Match Levels
+ **/
+enum MatchLevel {
+  o GOOD_MATCH  // DOB, SSN and name match
+  o SUB_NAME    //DOB, SSN match but name mismatch  
+  o SUB_SSN    //DOB, name match but no SSN specified  
+  o CUST_NOSHARE    //Customer does not want to share his data 
+}
+
+/**
+ * Match Status
+ **/
+enum MatchStatus {
+  o PENDING  
+  o FOUND    
+  o NOT_FOUND   
+}
+
+/**
+ * Two states for sending a trace request
+ * PENDING - initial state when it is created
+ * REQ_APPROVED - when the manager approves it
+ */
+enum ReqCustDetailsStatus {
+  o REQ_APPROVED  
+  o PENDING
+}
+
+/**
+ * Three states for a Long Term care claim
+ * SUBMITTED - initial state when an agent enters the claim
+ * PROCESSED - marked by the system when the process transaction is executed
+ * PAID -  When the company actually pays it
+ */
+enum ltcClaimStatus {
+  o SUBMITTED
+  o PROCESSED  
+  o PAID  
+}
+
+/**
+ * Two states for a customer/policy record
+ * OK - the regular state
+ * UNTRACEABLE - when the agent updates it, the beneficiary is untraceable
+ */
+enum InsCustStatus {
+  o OK
+  o UNTRACEABLE  
+}
+
+/** 
+ * Relation of the nominee to the insured
+ **/
+enum NomineeRelation {
+  o SPOUSE
+  o PARTNER
+  o SIBLING
+  o CHILD
+  o DAUGHTER
+  o SON
+}
+
+/**
+ * A concept for a nominee
+ * A nominee need not be a customer of the insurance company, hence modeled as a concept
+ **/
+concept Nominee {
+  o NomineeRelation nomReln
+  o String nomName
+  o String nomContact
+  o String nomSSN default = ""
+  o DateTime nomDateOfBirth
+  o DateTime nomDateOfDeath  optional
+}
+
+/**
+ * A concept for a response to a contact (RequestCustomerDetails) enquiry
+ **/
+concept Response {
+  o String insCoId  // responding Insurance company id
+  o MatchStatus matchStatus  // initial status PENDING on creation
+  o MatchLevel matchLevel optional  // the match level if MatchStatus is FOUND
+  o String contact optional     //if MatchStatus is FOUND
+  o String name optional        //if MatchStatus is FOUND
+}
+
+/**
+ * A concept for a LTC per ins Co claimed
+ **/
+concept InsCoClaim {
+  o String insCoId  // other Insurance company id
+  o Integer amtPaid  
+}
+
+/**
+ * A concept for a simple street address
+ * Not used here - only for illustration
+ */
+concept Address {
+  o String city
+  o String country
+  o String state
+  o String street1
+  o String street2 optional
+  o String postalCode
+  o String postOfficeBoxNumber optional
+}
+
+/**
+ * Participants
+ **/
+/**
+ * Representative of the insurance company 
+ * For signing agreements and who obtains the insurance company id when registering into the system
+ **/
+participant InsuranceCompany identified by insCoId {
+  o String insCoId
+  o String insCoName
+  o String insCoContact
+  o String[] insAgree //insCoIds of the companies that this company is tied up with
+}
+/**
+ * An Insurance Regulator - AGENT or MANAGER
+ */
+participant InsuranceEmployee identified by insEmpId {
+  o String insEmpId
+  o String insCoId
+  o String insEmpName
+  o String insEmpContact
+  o InsEmpLevel insEmplevel
+}
+/**
+ * An Insurance Regulator
+ */
+participant InsuranceRegulator identified by Id {
+  o String Id
+  o String regName
+}
+
+/**
+ * Assets
+ */
+/**
+ * An Insurance Customer - a customer record per an insurance company
+ * A person with a single SSN could have a customer record in each company
+ */
+asset InsuranceCustomer identified by insCustId {
+  o String insCustId   //insCoId + insCoCustId
+  o String insCoId    //refers to the id of the InsuranceCompany
+  o String insCoCustId
+  o String custName
+  o String Contact
+  o String SSN
+  o DateTime DateOfBirth
+  o DateTime dateUpdated
+  o Boolean rightToShare  default=true //True if customer is okay with sharing his details
+  o Boolean isDead default=false optional
+  o Boolean isNormalDeath optional   //N - under investigation  
+  o DateTime DateOfDeath optional
+  o InsCustStatus status
+}
+
+/**
+ * An Insurance Shaing agreement between companies
+ */
+asset InsSharingAgreement identified by insShrId {
+  o String insShrId
+  o String insCoIdA  // first party
+  o String insCoIdB  // second party
+  o DateTime startDate
+  o DateTime endDate
+}
+
+/**
+ * An Insurance Policy
+ */
+asset InsPolicy identified by insPolId {
+  o String insPolId   //insCoId + insCoCustId + Pol No
+  o String insCoId
+  o String insCoCustId
+  o String polNo
+  o DateTime polStartDate
+  o DateTime polEndDate
+  o Integer sumAssured
+  o Boolean isNomineeCustomer    //if nominee is a customer of the same insurance company, then nomCustId else Nominee
+  o String nomCustId   optional //if nominee is a customer of the same insurance company, then insCustId else Nominee
+  o Nominee nom optional
+  o DateTime nomContactUpdateDate
+  o Boolean optedLTC default=false
+  o Integer amtLTCperDiem default = 0 
+  o InsCustStatus nomineeContactable default='OK' 
+  o Boolean isClosed default=false  //Policy is closed when sum is paid out
+}
+
+asset LTC identified by ltcId {
+  o String ltcId
+  o String insCoId
+  --> InsPolicy policy
+  o DateTime fromDate
+  o DateTime toDate
+  o String billNo
+  o Integer billAmt   //total bill amount
+  o Integer totalAmtEligible //calculated
+  o InsCoClaim[] claims
+  o ltcClaimStatus ltcStatus //starts with SUBMITTED, chg to PROCESSED, could be PAID in later versions
+  o Integer amtPaid    //calculated by the system
+}
+
+asset RequestCustomerDetails identified by reqCustDetId {
+  o String reqCustDetId  //insPolId + insCoId 
+  o String insCoId  //sending ins co id  
+  o Response[] responses // one for each ins co with whom this ins co has an agreement
+  o String name
+  o String contact
+  o String SSN
+  o DateTime dateOfBirth  
+  o DateTime lastUpdateDate //Beneficiary address last update date
+  o ReqCustDetailsStatus reqStatus
+  o DateTime updateDate   //Date this Req was last updated
+}
+
+
+/**
+ * Updated by the ins employee and approved by manager
+ * generates a RequestCustomerDetailsEvent 
+ */
+transaction UpdateCantTraceNominee {
+  o String insPolId //insurance policy
+  o DateTime updateDate //date of this transaction
+}
+
+event RequestCustomerDetailsEvent {
+  o String reqCustDetId
+  o String insPolId    //originator co policy number
+  o String insCoId     //originator co Id
+  o DateTime reqSentDate  
+}
+
+
+transaction approveRCD{
+  o DateTime updateDate
+  o String rcdId  
+}
+
+event approveRCDEvent {
+  o ReqCustDetailsStatus rcdStatus
+  o String rcdId
+  o String insCoId   
+}
+
+event ReceiverRCDEvent {
+  o String rcdId         //request customer detail id
+  o String insCoId     //originator co Id
+  o String recInsCoId     //receiver co Id
+  o Response response     //response sent or pending  
+}
+
+
+/**
+ * AuthorizeRCD is for the manager of the insurace company to which the ReceiveRCDEvent is sent to 
+ * mgr id - captured by the BlockChain History record
+ */
+transaction authorizeRCD{
+  o String rcdId         //request customer detail id
+  o MatchStatus matchStatus  
+  o String insCoId     //originator co Id
+  o String recInsCoId     //receiver co Id
+  o MatchLevel matchLevel 
+  o String name 
+  o String contact
+}
+
+event authorizeRCDEvent {
+  o String rcdId
+  o MatchStatus matchStatus    
+  o String insCoId   
+}
+
+
+/**
+ * Updated by the system for all customers and notified to the corr ins companies
+ * (name, SSN, DOB)
+ */
+transaction UpdateCustDeath {
+  o String SSN  
+  o String name  
+  o DateTime DOB //Date of birth  
+  o DateTime DOD //Date of death  
+}
+
+event UpdateCustDeathEvent {
+  o String insCustId
+  o String insCoCustId
+  o String SSN
+  o String insCoId
+}
+
+
+
+/**
+ * Transaction to submit a ltc reimbursement
+ */
+transaction SubmitLTCReimbursement {
+  o String ltcRId   //id for the appl
+  o String insPolId //id for the insurance policy
+  o DateTime fromDate
+  o DateTime toDate
+  o String billNo
+  o Integer billAmt
+}
+
+event SubmitLTCReimbursementEvent {
+  o String ltcRId
+}
+
+transaction GetTraceNomineeHist {
+  o DateTime fromDate
+}
+
+event GetTraceNomineeHistEvent {
+  o String transactionId
+  o String transactionType
+  o String transactionInvokedRef
+  o String participantInvokingRef  optional
+  o String identityUsedRef         optional
+  o Event[] eventsEmitted        optional
+  o DateTime transactionTimestamp  
+}
+
+
+//setting up ins co data
+transaction SetupDemoInsCo  {
+}
+//setting up demo cust data
+transaction SetupDemoCust {
+}
+//setting up demo policies
+transaction SetupDemoPolicies {
+}
+

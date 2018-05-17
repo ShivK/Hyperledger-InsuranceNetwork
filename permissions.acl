@@ -1,0 +1,140 @@
+/**
+ * Access Control List for the insurance network.
+ */
+rule InsRegulator {
+    description: "Allow the regulator full read  access"
+    participant: "org.insurance.network.InsuranceRegulator"
+    operation: READ
+    resource: "org.insurance.network.*"
+    action: ALLOW
+}
+
+rule historianAccess {
+  description: "allow regulator to read historian records"
+  participant: "org.insurance.network.InsuranceRegulator"
+  operation: READ
+  resource: "org.hyperledger.composer.system.HistorianRecord"
+  action: ALLOW
+}
+
+
+
+rule InsEmployee {
+    description: "Allow read access"
+    participant: "org.insurance.network.InsuranceEmployee"
+    operation: READ
+    resource: "org.insurance.network.*"
+    action: ALLOW
+}
+rule InsCustRecOwner {
+    description: "Allow the employees of a insco total access to their customer records"
+    participant(m): "org.insurance.network.InsuranceEmployee"
+    operation: ALL
+    resource(v): "org.insurance.network.InsuranceCustomer"
+    condition: (v.insCoId == m.insCoId)
+    action: ALLOW
+}
+
+rule InsCustRecOwnerDeny {
+    description: "Deny CUD access to other ins co customer records"
+    participant(m): "org.insurance.network.InsuranceEmployee"
+    operation: CREATE, UPDATE, DELETE
+    resource(v): "org.insurance.network.InsuranceCustomer"
+    condition: (v.insCoId != m.insCoId)
+    action: DENY
+}
+
+rule InsPolicyRecOwner {
+    description: "Allow the managers of a insco total access to their customer records"
+    participant(m): "org.insurance.network.InsuranceEmployee"
+    operation: ALL
+    resource(v): "org.insurance.network.InsPolicy"
+    condition: (v.insCoId == m.insCoId && m.insEmpLevel == 'AGENT')
+    action: ALLOW
+}
+
+rule InsPolicyRecOwnerDeny {
+    description: "Deny all access to other ins co policy records"
+    participant(m): "org.insurance.network.InsuranceEmployee"
+    operation: CREATE, UPDATE, DELETE
+    resource(v): "org.insurance.network.InsPolicy"
+    condition: (v.insCoId != m.insCoId )
+    action: DENY
+}
+
+rule RCDManager {
+    description: "All access to managers"
+    participant(m): "org.insurance.network.InsuranceEmployee"
+    operation: ALL
+    resource(v): "org.insurance.network.RequestCustomerDetails"
+    condition: (m.insEmpLevel = 'MANAGER' )
+    action: ALLOW
+}
+rule RCDAgentDeny {
+    description: "Deny UD access for RCD records to agents"
+    participant(m): "org.insurance.network.InsuranceEmployee"
+    operation: UPDATE, DELETE
+    resource(v): "org.insurance.network.RequestCustomerDetails"
+    condition: (m.insEmpLevel = 'AGENT' )
+    action: DENY
+}
+
+
+rule UpdateCantTraceNomineeTxn {
+    description: ""
+    participant(m): "org.insurance.network.InsuranceEmployee"
+    operation: CREATE
+    resource : "org.insurance.network.UpdateCantTraceNominee"
+    condition: (m.insEmpLevel == 'AGENT')
+    action: ALLOW
+}
+
+rule approveRCDTxn {
+    description: "Only managers can approve txns"
+    participant(m): "org.insurance.network.InsuranceEmployee"
+    operation: CREATE
+    resource : "org.insurance.network.approveRCD"
+    condition: (m.insEmpLevel == 'MANAGER')
+    action: ALLOW
+}
+
+rule approveRCDTxnDeny {
+    description: "Agents not allowed to approve"
+    participant(m): "org.insurance.network.InsuranceEmployee"
+    operation: CREATE
+    resource : "org.insurance.network.approveRCD"
+    condition: (m.insEmpLevel == 'AGENT')
+    action: DENY
+}
+
+rule GetTraceNomineeHistTxn {
+    description: "Only managers can approve txns"
+    participant: "org.insurance.network.InsuranceRegulator"
+    operation: ALL
+    resource: "org.insurance.network.GetTraceNomineeHist"
+    action: ALLOW
+}
+
+rule GetTraceNomineeHistTxnDeny {
+    description: "Only managers can approve txns"
+    participant: "org.insurance.network.InsuranceEmployee"
+    operation: ALL
+    resource: "org.insurance.network.GetTraceNomineeHist"
+    action: DENY
+}
+
+rule Default {
+    description: "Allow all participants access to all resources"
+    participant: "ANY"
+    operation: ALL
+    resource: "org.insurance.network.*"
+    action: ALLOW
+}
+
+rule SystemACL {
+  description:  "System ACL to permit all access"
+  participant: "org.hyperledger.composer.system.Participant"
+  operation: ALL
+  resource: "org.hyperledger.composer.system.**"
+  action: ALLOW
+}

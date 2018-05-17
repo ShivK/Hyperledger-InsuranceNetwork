@@ -1,0 +1,66 @@
+/**
+ * used by updateDeath transaction
+**/
+query selectCustBySSN {
+  description: "Select the Customers by SSN, the same cust could have a policy with many companies"
+  statement:
+      SELECT org.insurance.network.InsuranceCustomer
+          WHERE (_$ssnPar == SSN)
+}
+/**
+ * Select the customer by SSN and DOB 
+ */
+query selectCustBySSN_DOB {
+  description: "Select the Customers by SSN, DOB per company"
+  statement:
+      SELECT org.insurance.network.InsuranceCustomer
+          WHERE (_$ssnPar == SSN AND _$dobPar == DateOfBirth)
+}
+/**
+ * Select the Nominee by DOB and name 
+ */
+ query selectNomByDOB_Name {
+  description: "Select the Nominee"
+  statement:
+      SELECT org.insurance.network.InsPolicy
+          WHERE ((_$namePar == nom.nomName) AND 
+                (_$dobPar == nom.nomDateOfBirth)
+          )
+}
+/**
+ * used by SubmitLTC
+**/
+query selectLTCByBillNo {
+  description: "Select the LTC records by bill no (SSN + billno)"
+  statement:
+      SELECT org.insurance.network.LTC
+          WHERE (_$billNoPar == billNo)
+}
+/**
+ * used by SubmitLTC
+**/
+query selectLTCByBillNo_InsCo {
+  description: "Select the LTC records by bill no (SSN + billno)"
+  statement:
+      SELECT org.insurance.network.LTC
+          WHERE (_$billNoPar == billNo AND _$insCoIdPar == insCoId)
+}
+/**
+ * used by Regulator to check on approveRCD Txns
+**/
+query HistTraceByDate {
+  description: "Select from HistorianRecords by transaction type"
+  statement: SELECT org.hyperledger.composer.system.HistorianRecord
+  		WHERE (('org.insurance.network.approveRCD' == transactionType OR 
+              'org.insurance.network.authorizeRCD' == transactionType OR 
+              'org.insurance.network.UpdateCantTraceNominee' == transactionType) AND
+             (_$fromDatePar < transactionTimestamp))
+}
+
+
+query selectCustAll {
+  description: "Select all the Customers"
+  statement:
+      SELECT org.insurance.network.InsuranceCustomer
+}
+
